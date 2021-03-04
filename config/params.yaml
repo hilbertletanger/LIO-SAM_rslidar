@@ -23,8 +23,8 @@ lio_sam:
   savePCDDirectory: "/Downloads/LOAM/"        # in your home folder, starts and ends with "/". Warning: the code deletes "LOAM" folder then recreates it. See "mapOptimization" for implementation
 
   # Sensor Settings
-  sensor: velodyne                            # lidar sensor type, either 'velodyne' or 'ouster'
-  N_SCAN: 16                                  # number of lidar channel (i.e., 16, 32, 64, 128)
+  sensor: rslidar                            # lidar sensor type, either 'velodyne' or 'ouster' or'rslidar'
+  N_SCAN: 32                                  # number of lidar channel (i.e., 16, 32, 64, 128)
   Horizon_SCAN: 1800                          # lidar horizontal resolution (Velodyne:1800, Ouster:512,1024,2048)
   downsampleRate: 1                           # default: 1. Downsample your data if too many points. i.e., 16 = 64 / 4, 16 = 16 / 1
   lidarMinRange: 1.0                          # default: 1.0, minimum lidar range to be used
@@ -40,11 +40,11 @@ lio_sam:
 
   # Extrinsics (lidar -> IMU)
   extrinsicTrans: [0.0, 0.0, 0.0]
-  extrinsicRot: [-1, 0, 0,
+  extrinsicRot: [1, 0, 0,
                   0, 1, 0,
-                  0, 0, -1]
-  extrinsicRPY: [0,  1, 0,
-                 -1, 0, 0,
+                  0, 0, 1]
+  extrinsicRPY: [1,  0, 0,
+                 0, 1, 0,
                   0, 0, 1]
   # extrinsicRot: [1, 0, 0,
   #                 0, 1, 0,
