@@ -198,7 +198,7 @@ public:
         cloudExtraction();
 
         publishClouds();
-
+        
         resetParameters();
     }
 
@@ -215,7 +215,6 @@ public:
         if (sensor == SensorType::VELODYNE)
         {
             pcl::moveFromROSMsg(currentCloudMsg, *laserCloudIn);
-            ROS_WARN_STREAM("RING is  " << int((laserCloudIn->points[1]).time));
         }
         else if (sensor == SensorType::OUSTER)
         {
@@ -243,6 +242,7 @@ public:
             pcl::removeNaNFromPointCloud(*tmpRsCloudIn, *tmpRsCloudIn, mapping);
             laserCloudIn->points.resize(tmpRsCloudIn->size());
             laserCloudIn->is_dense = tmpRsCloudIn->is_dense;
+
             for (size_t i = 0; i < tmpRsCloudIn->size(); i++)
             {
                 auto &src = tmpRsCloudIn->points[i];
@@ -252,20 +252,28 @@ public:
                 dst.z = src.z;
                 dst.intensity = src.intensity;
                 dst.ring = src.ring;
-                dst.time = src.timestamp * 1e-9f;
-                // ROS_WARN_STREAM("RING is  " << int(dst.ring));
+                dst.time = src.timestamp*1e-9f ;
             }
+            // ROS_WARN_STREAM("time is  " << (laserCloudIn->points[100]).time);
         }
         else
         {
             ROS_ERROR_STREAM("Unknown sensor type: " << int(sensor));
             ros::shutdown();
         }
-
+       
         // get timestamp
         cloudHeader = currentCloudMsg.header;
         timeScanCur = cloudHeader.stamp.toSec();
-        timeScanEnd = timeScanCur + laserCloudIn->points.back().time;
+        if (sensor == SensorType::RSLIDAR)
+        {
+            timeScanEnd = timeScanCur + laserCloudIn->points.back().time - laserCloudIn->points.front().time;
+        }
+        else
+        {
+            timeScanEnd = timeScanCur + laserCloudIn->points.back().time;
+        }
+        
 
         // check dense flag
         if (laserCloudIn->is_dense == false)
@@ -273,7 +281,7 @@ public:
             ROS_ERROR("Point cloud is not in dense format, please remove NaN points first!");
             ros::shutdown();
         }
-
+        
         // check ring channel
         static int ringFlag = 0;
         if (ringFlag == 0)
@@ -293,14 +301,14 @@ public:
                 ros::shutdown();
             }
         }
-
+       
         // check point time
         if (deskewFlag == 0)
         {
             deskewFlag = -1;
             for (auto &field : currentCloudMsg.fields)
             {
-                if (field.name == "time" || field.name == "t")
+                if (field.name == "time" || field.name == "t" ||field.name == "timestamp")
                 {
                     deskewFlag = 1;
                     break;
@@ -319,18 +327,23 @@ public:
     {
         std::lock_guard<std::mutex> lock1(imuLock);
         std::lock_guard<std::mutex> lock2(odoLock);
-
+        
         // make sure IMU data available for the scan
         if (imuQueue.empty() || imuQueue.front().header.stamp.toSec() > timeScanCur || imuQueue.back().header.stamp.toSec() < timeScanEnd)
         {
+            ROS_DEBUG_STREAM("IMU queue size " << int(imuQueue.size()));
+            ROS_DEBUG_STREAM("IMU queue front time " << int(imuQueue.front().header.stamp.toSec()));
+            ROS_DEBUG_STREAM("LIDAR cur time " << int(timeScanCur));
+            ROS_DEBUG_STREAM("IMU queue back time " << int(imuQueue.back().header.stamp.toSec()));
+            ROS_DEBUG_STREAM("LIDAR end time " << int(timeScanEnd));
             ROS_DEBUG("Waiting for IMU data ...");
             return false;
         }
-
+        
         imuDeskewInfo();
-
+        ROS_DEBUG("od");
         odomDeskewInfo();
-
+        ROS_DEBUG("odafter");
         return true;
     }
 
@@ -553,9 +566,39 @@ public:
     void projectPointCloud()
     {
         int cloudSize = laserCloudIn->points.size();
+
+        // float startOri = -atan2(laserCloudIn->points[0].y, laserCloudIn->points[0].x);
+        // float endOri = -atan2(laserCloudIn->points[cloudSize - 1].y,laserCloudIn->points[cloudSize - 1].x) + 2 * M_PI;
+        // if (endOri - startOri > 3 * M_PI) {
+        //     endOri -= 2 * M_PI;
+        // } else if (endOri - startOri < M_PI) {
+        //     endOri += 2 * M_PI;
+        // }
+
+        // bool halfPassed = false;
+
         // range image projection
         for (int i = 0; i < cloudSize; ++i)
-        {
+        {   
+            // float ori = -atan2(laserCloudIn->points[i].y, laserCloudIn->points[i].x);
+            // if (!halfPassed) {
+            //     if (ori < startOri - M_PI / 2) {
+            //         ori += 2 * M_PI;
+            //     } else if (ori > startOri + M_PI * 3 / 2) {
+            //         ori -= 2 * M_PI;
+            //     }
+            //     if (ori - startOri > M_PI) {
+            //         halfPassed = true;
+            //     }
+            // } else {
+            //     ori += 2 * M_PI;
+            //     if (ori < endOri - M_PI * 3 / 2) {
+            //         ori += 2 * M_PI;
+            //     } else if (ori > endOri + M_PI / 2) {
+            //         ori -= 2 * M_PI;
+            //     }
+            // }
+            // float relTime = (ori - startOri) / (endOri - startOri);
             PointType thisPoint;
             thisPoint.x = laserCloudIn->points[i].x;
             thisPoint.y = laserCloudIn->points[i].y;
