@@ -18,8 +18,8 @@ struct RsPointXYZIRT
 {
   PCL_ADD_POINT4D;
   uint8_t intensity;
-  uint16_t ring = 0;
-  double timestamp = 0;
+  uint16_t ring;
+  double timestamp;
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 } EIGEN_ALIGN16;
 POINT_CLOUD_REGISTER_POINT_STRUCT(RsPointXYZIRT, (float, x, x)(float, y, y)(float, z, z)(uint8_t, intensity, intensity)(uint16_t, ring, ring)(double, timestamp, timestamp))
@@ -215,6 +215,7 @@ public:
         if (sensor == SensorType::VELODYNE)
         {
             pcl::moveFromROSMsg(currentCloudMsg, *laserCloudIn);
+            ROS_WARN_STREAM("RING is  " << int((laserCloudIn->points[1]).time));
         }
         else if (sensor == SensorType::OUSTER)
         {
@@ -238,6 +239,8 @@ public:
         {
             // Convert to Velodyne format
             pcl::moveFromROSMsg(currentCloudMsg, *tmpRsCloudIn);
+            std::vector<int> mapping;
+            pcl::removeNaNFromPointCloud(*tmpRsCloudIn, *tmpRsCloudIn, mapping);
             laserCloudIn->points.resize(tmpRsCloudIn->size());
             laserCloudIn->is_dense = tmpRsCloudIn->is_dense;
             for (size_t i = 0; i < tmpRsCloudIn->size(); i++)
@@ -250,6 +253,7 @@ public:
                 dst.intensity = src.intensity;
                 dst.ring = src.ring;
                 dst.time = src.timestamp * 1e-9f;
+                // ROS_WARN_STREAM("RING is  " << int(dst.ring));
             }
         }
         else
@@ -303,7 +307,9 @@ public:
                 }
             }
             if (deskewFlag == -1)
+            {
                 ROS_WARN("Point cloud timestamp not available, deskew function disabled, system will drift significantly!");
+            }
         }
 
         return true;

@@ -26,6 +26,7 @@
 #include <pcl/registration/icp.h>
 #include <pcl/io/pcd_io.h>
 #include <pcl/filters/filter.h>
+#include <pcl/filters/impl/filter.hpp>
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/filters/crop_box.h> 
 #include <pcl_conversions/pcl_conversions.h>
@@ -154,8 +155,8 @@ public:
     {
         nh.param<std::string>("/robot_id", robot_id, "roboat");
 
-        nh.param<std::string>("lio_sam/pointCloudTopic", pointCloudTopic, "points_raw");
-        nh.param<std::string>("lio_sam/imuTopic", imuTopic, "imu_correct");
+        nh.param<std::string>("lio_sam/pointCloudTopic", pointCloudTopic, "rslidar_points");
+        nh.param<std::string>("lio_sam/imuTopic", imuTopic, "imu");
         nh.param<std::string>("lio_sam/odomTopic", odomTopic, "odometry/imu");
         nh.param<std::string>("lio_sam/gpsTopic", gpsTopic, "odometry/gps");
 
@@ -181,6 +182,10 @@ public:
         else if (sensorStr == "ouster")
         {
             sensor = SensorType::OUSTER;
+        }
+        else if (sensorStr == "rslidar")
+        {
+            sensor = SensorType::RSLIDAR;
         }
         else
         {
