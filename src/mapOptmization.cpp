@@ -250,15 +250,23 @@ public:
 
             updateInitialGuess();
 
+            float transInitSave[6];
+            int len = sizeof(transformTobeMapped) / sizeof(transformTobeMapped[0]);
+            memcpy(transInitSave,transformTobeMapped,len*sizeof(float));  
+
             extractSurroundingKeyFrames();
 
             downsampleCurrentScan();
 
             scan2MapOptimization();
 
+            memcpy(transformTobeMapped,transInitSave,len*sizeof(float));  
+
             saveKeyFramesAndFactor();
 
-            correctPoses();
+            memcpy(transformTobeMapped,transInitSave,len*sizeof(float));  
+            
+            // correctPoses();
 
             publishOdometry();
 
