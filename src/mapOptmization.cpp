@@ -1535,9 +1535,12 @@ public:
         // cout << "****************************************************" << endl;
         // isamCurrentEstimate.print("Current estimate: ");
 
-        thisPose3D.x = latestEstimate.translation().x();
-        thisPose3D.y = latestEstimate.translation().y();
-        thisPose3D.z = latestEstimate.translation().z();
+        // thisPose3D.x = latestEstimate.translation().x();
+        // thisPose3D.y = latestEstimate.translation().y();
+        // thisPose3D.z = latestEstimate.translation().z();
+        thisPose3D.x = transformTobeMapped[3];
+        thisPose3D.y = transformTobeMapped[4];
+        thisPose3D.z = transformTobeMapped[5];
         thisPose3D.intensity = cloudKeyPoses3D->size(); // this can be used as index
         cloudKeyPoses3D->push_back(thisPose3D);
 
@@ -1545,9 +1548,9 @@ public:
         thisPose6D.y = thisPose3D.y;
         thisPose6D.z = thisPose3D.z;
         thisPose6D.intensity = thisPose3D.intensity ; // this can be used as index
-        thisPose6D.roll  = latestEstimate.rotation().roll();
-        thisPose6D.pitch = latestEstimate.rotation().pitch();
-        thisPose6D.yaw   = latestEstimate.rotation().yaw();
+        thisPose6D.roll  = transformTobeMapped[0];
+        thisPose6D.pitch = transformTobeMapped[1];
+        thisPose6D.yaw   = transformTobeMapped[2];
         thisPose6D.time = timeLaserInfoCur;
         cloudKeyPoses6D->push_back(thisPose6D);
 
@@ -1557,12 +1560,12 @@ public:
         poseCovariance = isam->marginalCovariance(isamCurrentEstimate.size()-1);
 
         // save updated transform
-        transformTobeMapped[0] = latestEstimate.rotation().roll();
-        transformTobeMapped[1] = latestEstimate.rotation().pitch();
-        transformTobeMapped[2] = latestEstimate.rotation().yaw();
-        transformTobeMapped[3] = latestEstimate.translation().x();
-        transformTobeMapped[4] = latestEstimate.translation().y();
-        transformTobeMapped[5] = latestEstimate.translation().z();
+        // transformTobeMapped[0] = latestEstimate.rotation().roll();
+        // transformTobeMapped[1] = latestEstimate.rotation().pitch();
+        // transformTobeMapped[2] = latestEstimate.rotation().yaw();
+        // transformTobeMapped[3] = latestEstimate.translation().x();
+        // transformTobeMapped[4] = latestEstimate.translation().y();
+        // transformTobeMapped[5] = latestEstimate.translation().z();
 
         // save all the received edge and surf points
         pcl::PointCloud<PointType>::Ptr thisCornerKeyFrame(new pcl::PointCloud<PointType>());
