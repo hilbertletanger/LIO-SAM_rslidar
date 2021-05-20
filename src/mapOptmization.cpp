@@ -126,8 +126,8 @@ public:
     double timeLaserInfoCur;
 
     float transformTobeMapped[6];
-    float transInitSave[6];
-    int len;
+    // float transInitSave[6];
+    // int len;
 
     std::mutex mtx;
     std::mutex mtxLoopInfo;
@@ -252,6 +252,8 @@ public:
 
             updateInitialGuess();
 
+            float transInitSave[6];
+            int len;
             len = sizeof(transformTobeMapped) / sizeof(transformTobeMapped[0]);
             memcpy(transInitSave,transformTobeMapped,len*sizeof(float));  
 
