@@ -266,7 +266,7 @@ public:
 
             memcpy(transformTobeMapped,transInitSave,len*sizeof(float));  
             
-            // correctPoses();
+            correctPoses();
 
             publishOdometry();
 
