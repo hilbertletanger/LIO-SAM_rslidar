@@ -126,6 +126,8 @@ public:
     double timeLaserInfoCur;
 
     float transformTobeMapped[6];
+    float transInitSave[6];
+    int len;
 
     std::mutex mtx;
     std::mutex mtxLoopInfo;
@@ -250,8 +252,7 @@ public:
 
             updateInitialGuess();
 
-            float transInitSave[6];
-            int len = sizeof(transformTobeMapped) / sizeof(transformTobeMapped[0]);
+            len = sizeof(transformTobeMapped) / sizeof(transformTobeMapped[0]);
             memcpy(transInitSave,transformTobeMapped,len*sizeof(float));  
 
             extractSurroundingKeyFrames();
@@ -1306,6 +1307,7 @@ public:
                 if (LMOptimization(iterCount) == true)
                     break;              
             }
+            memcpy(transformTobeMapped,transInitSave,len*sizeof(float));  
 
             transformUpdate();
         } else {
@@ -1341,6 +1343,9 @@ public:
         transformTobeMapped[0] = constraintTransformation(transformTobeMapped[0], rotation_tollerance);
         transformTobeMapped[1] = constraintTransformation(transformTobeMapped[1], rotation_tollerance);
         transformTobeMapped[5] = constraintTransformation(transformTobeMapped[5], z_tollerance);
+
+        memcpy(transformTobeMapped,transInitSave,len*sizeof(float));  
+
 
         incrementalOdometryAffineBack = trans2Affine3f(transformTobeMapped);
     }
