@@ -1307,7 +1307,7 @@ public:
                 if (LMOptimization(iterCount) == true)
                     break;              
             }
-            memcpy(transformTobeMapped,transInitSave,len*sizeof(float));  
+            // memcpy(transformTobeMapped,transInitSave,len*sizeof(float));  
 
             transformUpdate();
         } else {
