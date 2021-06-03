@@ -250,9 +250,9 @@ public:
 
             updateInitialGuess();
 
-            float transInitSave[6];
-            int len = sizeof(transformTobeMapped) / sizeof(transformTobeMapped[0]);
-            memcpy(transInitSave,transformTobeMapped,len*sizeof(float));  
+            // float transInitSave[6];
+            // int len = sizeof(transformTobeMapped) / sizeof(transformTobeMapped[0]);
+            // memcpy(transInitSave,transformTobeMapped,len*sizeof(float));  
 
             extractSurroundingKeyFrames();
 
@@ -260,11 +260,11 @@ public:
 
             scan2MapOptimization();
 
-            memcpy(transformTobeMapped,transInitSave,len*sizeof(float));  
+            // memcpy(transformTobeMapped,transInitSave,len*sizeof(float));  
 
             saveKeyFramesAndFactor();
 
-            memcpy(transformTobeMapped,transInitSave,len*sizeof(float));  
+            // memcpy(transformTobeMapped,transInitSave,len*sizeof(float));  
             
             correctPoses();
 
@@ -1585,6 +1585,8 @@ public:
 
         if (aLoopIsClosed == true)
         {
+            ROS_DEBUG("IN THE correctPoses");
+
             // clear map cache
             laserCloudMapContainer.clear();
             // clear path
@@ -1606,7 +1608,7 @@ public:
 
                 updatePath(cloudKeyPoses6D->points[i]);
             }
-
+            
             aLoopIsClosed = false;
         }
     }
@@ -1739,6 +1741,9 @@ public:
 int main(int argc, char** argv)
 {
     ros::init(argc, argv, "lio_sam");
+
+    ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME,ros::console::levels::Debug);
+
 
     mapOptimization MO;
 
