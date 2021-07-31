@@ -307,6 +307,28 @@ public:
         }
         return cloudOut;
     }
+    pcl::PointCloud<PointType>::Ptr transformPointCloudreserve(pcl::PointCloud<PointType>::Ptr cloudIn, PointTypePose* transformIn)
+    {
+        pcl::PointCloud<PointType>::Ptr cloudOut(new pcl::PointCloud<PointType>());
+
+        int cloudSize = cloudIn->size();
+        cloudOut->resize(cloudSize);
+
+        Eigen::Affine3f transCur = pcl::getTransformation(transformIn->x, transformIn->y, transformIn->z, transformIn->roll, transformIn->pitch, transformIn->yaw);
+        transCur = transCur.inverse();
+
+        #pragma omp parallel for num_threads(numberOfCores)
+        for (int i = 0; i < cloudSize; ++i)
+        {
+            const auto &pointFrom = cloudIn->points[i];
+            cloudOut->points[i].x = transCur(0,0) * pointFrom.x + transCur(0,1) * pointFrom.y + transCur(0,2) * pointFrom.z + transCur(0,3);
+            cloudOut->points[i].y = transCur(1,0) * pointFrom.x + transCur(1,1) * pointFrom.y + transCur(1,2) * pointFrom.z + transCur(1,3);
+            cloudOut->points[i].z = transCur(2,0) * pointFrom.x + transCur(2,1) * pointFrom.y + transCur(2,2) * pointFrom.z + transCur(2,3);
+            cloudOut->points[i].intensity = pointFrom.intensity;
+        }
+        return cloudOut;
+    }
+
 
     gtsam::Pose3 pclPointTogtsamPose3(PointTypePose thisPoint)
     {
@@ -474,23 +496,28 @@ public:
         for(auto& pt : globalMapKeyPosesDS->points)
         {
             kdtreeGlobalMap->nearestKSearch(pt, 1, pointSearchIndGlobalMap, pointSearchSqDisGlobalMap);
-            pt.intensity = cloudKeyPoses3D->points[pointSearchIndGlobalMap[0]].intensity;
+            // pt.intensity = cloudKeyPoses3D->points[pointSearchIndGlobalMap[0]].intensity;
         }
 
         // extract visualized and downsampled key frames
-        for (int i = 0; i < (int)globalMapKeyPosesDS->size(); ++i){
-            if (pointDistance(globalMapKeyPosesDS->points[i], cloudKeyPoses3D->back()) > globalMapVisualizationSearchRadius)
-                continue;
-            int thisKeyInd = (int)globalMapKeyPosesDS->points[i].intensity;
+        for (int i = 0; i < (int)globalMapKeyPoses->size(); ++i){
+            // if (pointDistance(globalMapKeyPosesDS->points[i], cloudKeyPoses3D->back()) > globalMapVisualizationSearchRadius)
+            //     continue;
+            int thisKeyInd = (int)globalMapKeyPoses->points[i].intensity;
             *globalMapKeyFrames += *transformPointCloud(cornerCloudKeyFrames[thisKeyInd],  &cloudKeyPoses6D->points[thisKeyInd]);
             *globalMapKeyFrames += *transformPointCloud(surfCloudKeyFrames[thisKeyInd],    &cloudKeyPoses6D->points[thisKeyInd]);
+            // *globalMapKeyFrames += *transformPointCloud(allCloudKeyFrames[thisKeyInd],    &cloudKeyPoses6D->points[thisKeyInd]);
+
         }
         // downsample visualized points
         pcl::VoxelGrid<PointType> downSizeFilterGlobalMapKeyFrames; // for global map visualization
         downSizeFilterGlobalMapKeyFrames.setLeafSize(globalMapVisualizationLeafSize, globalMapVisualizationLeafSize, globalMapVisualizationLeafSize); // for global map visualization
         downSizeFilterGlobalMapKeyFrames.setInputCloud(globalMapKeyFrames);
         downSizeFilterGlobalMapKeyFrames.filter(*globalMapKeyFramesDS);
-        publishCloud(&pubLaserCloudSurround, globalMapKeyFramesDS, timeLaserInfoStamp, odometryFrame);
+        
+        publishCloud(&pubLaserCloudSurround, globalMapKeyFrames, timeLaserInfoStamp, odometryFrame);
+
+        
     }
 
 
@@ -1707,9 +1734,34 @@ public:
             return;
         // publish key poses
         publishCloud(&pubKeyPoses, cloudKeyPoses3D, timeLaserInfoStamp, odometryFrame);
+
+
         // Publish surrounding key frames
-        publishCloud(&pubRecentKeyFrames, laserCloudSurfFromMapDS, timeLaserInfoStamp, odometryFrame);
+        //原版
+        // publishCloud(&pubRecentKeyFrames, laserCloudSurfFromMapDS, timeLaserInfoStamp, odometryFrame);
+        //为了随动的目标检测
+        if (pubRecentKeyFrames.getNumSubscribers() != 0)
+        {
+            pcl::PointCloud<PointType>::Ptr cloudOut(new pcl::PointCloud<PointType>());
+            PointTypePose thisPose6D = trans2PointTypePose(transformTobeMapped);
+            // thisPose6D.x = -thisPose6D.x;
+            // thisPose6D.y = -thisPose6D.y;
+            // thisPose6D.z = -thisPose6D.z;
+            // thisPose6D.roll  = -thisPose6D.roll;
+            // thisPose6D.pitch = -thisPose6D.pitch;
+            // thisPose6D.yaw   = -thisPose6D.yaw;
+
+
+            *cloudOut += *transformPointCloudreserve(laserCloudSurfFromMapDS,  &thisPose6D);
+            *cloudOut += *transformPointCloudreserve(laserCloudCornerFromMapDS,    &thisPose6D);
+            // *cloudOut += *laserCloudSurfFromMapDS;
+            // *cloudOut += *laserCloudCornerFromMapDS;
+
+            publishCloud(&pubRecentKeyFrames, cloudOut, timeLaserInfoStamp, odometryFrame);
+        }
+
         // publish registered key frame
+
         if (pubRecentKeyFrame.getNumSubscribers() != 0)
         {
             pcl::PointCloud<PointType>::Ptr cloudOut(new pcl::PointCloud<PointType>());

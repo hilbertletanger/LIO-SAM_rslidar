@@ -100,3 +100,8 @@ target_link_libraries(${PROJECT_NAME}_mapOptmization ${catkin_LIBRARIES} ${PCL_L
 # IMU Preintegration
 add_executable(${PROJECT_NAME}_imuPreintegration src/imuPreintegration.cpp)
 target_link_libraries(${PROJECT_NAME}_imuPreintegration ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES} gtsam)
+
+##submap extract
+file(GLOB LIDAR_OD_SOURCE_FILES src/parkingDetection.cpp src/lidarod/render/*.cpp src/lidarod/*.cpp)
+add_executable(${PROJECT_NAME}_parkingDetection ${LIDAR_OD_SOURCE_FILES})
+target_link_libraries(${PROJECT_NAME}_parkingDetection ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES} gtsam)

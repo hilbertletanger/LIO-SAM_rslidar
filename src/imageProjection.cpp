@@ -162,21 +162,21 @@ public:
         imuQueue.push_back(thisImu);
 
         // debug IMU data
-        cout << std::setprecision(6);
-        cout << "IMU acc: " << endl;
-        cout << "x: " << thisImu.linear_acceleration.x << 
-              ", y: " << thisImu.linear_acceleration.y << 
-              ", z: " << thisImu.linear_acceleration.z << endl;
-        cout << "IMU gyro: " << endl;
-        cout << "x: " << thisImu.angular_velocity.x << 
-              ", y: " << thisImu.angular_velocity.y << 
-              ", z: " << thisImu.angular_velocity.z << endl;
+        // cout << std::setprecision(6);
+        // cout << "IMU acc: " << endl;
+        // cout << "x: " << thisImu.linear_acceleration.x << 
+        //       ", y: " << thisImu.linear_acceleration.y << 
+        //       ", z: " << thisImu.linear_acceleration.z << endl;
+        // cout << "IMU gyro: " << endl;
+        // cout << "x: " << thisImu.angular_velocity.x << 
+        //       ", y: " << thisImu.angular_velocity.y << 
+        //       ", z: " << thisImu.angular_velocity.z << endl;
         double imuRoll, imuPitch, imuYaw;
         tf::Quaternion orientation;
         tf::quaternionMsgToTF(thisImu.orientation, orientation);
         tf::Matrix3x3(orientation).getRPY(imuRoll, imuPitch, imuYaw);
-        cout << "IMU roll pitch yaw: " << endl;
-        cout << "roll: " << imuRoll << ", pitch: " << imuPitch << ", yaw: " << imuYaw << endl << endl;
+        // cout << "IMU roll pitch yaw: " << endl;
+        // cout << "roll: " << imuRoll << ", pitch: " << imuPitch << ", yaw: " << imuYaw << endl << endl;
     }
 
     void odometryHandler(const nav_msgs::Odometry::ConstPtr& odometryMsg)
@@ -252,7 +252,7 @@ public:
                 dst.z = src.z;
                 dst.intensity = src.intensity;
                 dst.ring = src.ring;
-                dst.time = src.timestamp*1e-9f ;
+                dst.time = src.timestamp ;
             }
             // ROS_WARN_STREAM("time is  " << (laserCloudIn->points[100]).time);
         }
@@ -268,10 +268,14 @@ public:
         if (sensor == SensorType::RSLIDAR)
         {
             timeScanEnd = timeScanCur + laserCloudIn->points.back().time - laserCloudIn->points.front().time;
+            // cout << "timeScanEnd " << timeScanEnd << endl;
+
         }
         else
         {
             timeScanEnd = timeScanCur + laserCloudIn->points.back().time;
+            // cout << "timeScanEnd: " << timeScanEnd << endl;
+
         }
         
 
@@ -535,8 +539,19 @@ public:
     {
         if (deskewFlag == -1 || cloudInfo.imuAvailable == false)
             return *point;
+        double pointTime;
+        if(sensor ==SensorType::RSLIDAR)
+        {
+            pointTime = relTime;
+            // cout << "pointTime: " << pointTime << endl;
+        }
+        else
+        {
+            pointTime = timeScanCur + relTime;
+            // cout << "pointTime: " << pointTime << endl;
 
-        double pointTime = timeScanCur + relTime;
+        }
+        
 
         float rotXCur, rotYCur, rotZCur;
         findRotation(pointTime, &rotXCur, &rotYCur, &rotZCur);
