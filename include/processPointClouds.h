@@ -17,7 +17,7 @@
 #include <vector>
 #include <ctime>
 #include <chrono>
-#include "render/box.h"
+#include "box.h"
 
 #include <unordered_set>
 #include <random>

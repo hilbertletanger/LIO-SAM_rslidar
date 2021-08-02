@@ -20,13 +20,33 @@
 #include <pcl/features/moment_of_inertia_estimation.h>
 #include <pcl/visualization/cloud_viewer.h>
 
-#include "lidarod/render/render.h"
-#include "lidarod/processPointClouds.h"
+#include "render.h"
+#include "processPointClouds.h"
 // using templates for processPointClouds so also include .cpp to help linker
 #include "lidarod/processPointClouds.cpp"
+#include "TRK4D_Geometry.h"
+
+
 
 // #include <pcl>
+struct PointXYZIRPYT
+{
+    PCL_ADD_POINT4D
+    PCL_ADD_INTENSITY;                  // preferred way of adding a XYZ+padding
+    float roll;
+    float pitch;
+    float yaw;
+    double time;
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW   // make sure our new allocators are aligned
+} EIGEN_ALIGN16;                    // enforce SSE padding for correct memory alignment
 
+POINT_CLOUD_REGISTER_POINT_STRUCT (PointXYZIRPYT,
+                                   (float, x, x) (float, y, y)
+                                   (float, z, z) (float, intensity, intensity)
+                                   (float, roll, roll) (float, pitch, pitch) (float, yaw, yaw)
+                                   (double, time, time))
+
+typedef PointXYZIRPYT  PointTypePose;
 
 // struct OusterPointXYZIRT {
 //     PCL_ADD_POINT4D;
@@ -56,6 +76,7 @@ class parkingDetection : public ParamServer
 private:
 
     ros::Subscriber subMap;
+    ros::Subscriber subLocate;
     
     ros::Publisher pubParkinglot;
 
@@ -73,6 +94,10 @@ private:
 
     ProcessPointClouds<PointType> point_cloud_processor;
 
+    Box parkinglotMemory;
+    nav_msgs::Odometry currentLocate;
+    nav_msgs::Odometry memoryLocate;
+
 
 public:
     boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer;
@@ -80,6 +105,7 @@ public:
     parkingDetection()
     {
         subMap = nh.subscribe<sensor_msgs::PointCloud2>("lio_sam/mapping/map_local", 5, &parkingDetection::mapHandler, this, ros::TransportHints().tcpNoDelay());
+        subLocate = nh.subscribe<nav_msgs::Odometry>("lio_sam/mapping/odometry",5,&parkingDetection::locateHandler, this, ros::TransportHints().tcpNoDelay());
         
         // subMap = nh.subscribe<sensor_msgs::PointCloud2>("/radar_points2", 5, &parkingDetection::mapHandler, this, ros::TransportHints().tcpNoDelay());
         //这里的回调函数应该要改//TODO:
@@ -109,6 +135,12 @@ public:
     }
 
     ~parkingDetection(){}
+
+    void locateHandler(const nav_msgs::OdometryConstPtr& odometryMsg) //TODO:
+    {
+        currentLocate = *odometryMsg;
+    }
+
 
     void mapHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudMsg) //TODO:
     {
@@ -182,15 +214,15 @@ void cityBlock(pcl::visualization::PCLVisualizer::Ptr& viewer, ProcessPointCloud
 
     // Input point cloud, filter resolution, min Point, max Point
     constexpr float kFilterResolution = 0.2;
-    const Eigen::Vector4f kMinPoint(-50, -6.0, -3, 1);
-    const Eigen::Vector4f kMaxPoint(60, 6.5, 4, 1);
+    const Eigen::Vector4f kMinPoint(-50, -6.0, -3, 1); //deafult (-50, -6.0, -3, 1);
+    const Eigen::Vector4f kMaxPoint(60, 6.5, 4, 1);   //default (60, 6.5, 4, 1);
     auto filter_cloud = point_cloud_processor.FilterCloud(input_cloud, kFilterResolution, kMinPoint, kMaxPoint);
     // auto filter_cloud=input_cloud;
 
 //    renderPointCloud(viewer, filter_cloud, "FilteredCloud");
 
-    constexpr int kMaxIterations = 100;
-    constexpr float kDistanceThreshold = 0.4;
+    constexpr int kMaxIterations = 200;//default 100
+    constexpr float kDistanceThreshold = 0.2; //default 0.2
     auto segment_cloud = point_cloud_processor.SegmentPlane(filter_cloud, kMaxIterations, kDistanceThreshold);
 
 //    // render obstacles point cloud with red
@@ -206,12 +238,19 @@ void cityBlock(pcl::visualization::PCLVisualizer::Ptr& viewer, ProcessPointCloud
     constexpr int kMaxSize = 600;
     auto cloud_clusters = point_cloud_processor.Clustering(segment_cloud.first, kClusterTolerance, kMinSize, kMaxSize);
 
-    int cluster_ID = 1;
+    int cluster_ID = 2;
     std::vector<Color> colors = {Color(1, 0, 0), Color(0, 0, 1), Color(0.5, 0, 1)};
     int num_of_colors = colors.size();
 
     Box host_box = {-1.5, -1.7, -1, 2.6, 1.7, -0.4};
     renderBox(viewer, host_box, 0, Color(0.5, 0, 1), 0.8);
+
+    Box detect_box = {0, -6, -1, 1.7, -1.7, -0.4};
+    renderBox(viewer, detect_box, 1, Color(0.5, 1, 0), 0.8);
+    // vector<TRK4D_POINT3> bbox_vertex_a;
+    TRK4D_POINT3 detect_box_trans[4];
+    box2BboxVertex(detect_box,detect_box_trans);
+    bool overlapFlag=0;
 
     constexpr float kBBoxMinHeight = 0.75;
     for(const auto& cluster : cloud_clusters) {
@@ -221,13 +260,110 @@ void cityBlock(pcl::visualization::PCLVisualizer::Ptr& viewer, ProcessPointCloud
 //        renderPointCloud(viewer, cluster, "ObstacleCloud" + std::to_string(cluster_ID), colors[cluster_ID % num_of_colors]);
 
         Box box = point_cloud_processor.BoundingBox(cluster);
-        // Filter out some cluster with little points and shorter in height
-        if (box.z_max - box.z_min >= kBBoxMinHeight || cluster->points.size() >= kMinSize * 2) {
-            renderBox(viewer, box, cluster_ID);
+        TRK4D_POINT3 object_box_trans[4];
+        box2BboxVertex(box,object_box_trans);
+        if (TRK4D_fn_isBBoxOverlap(detect_box_trans,object_box_trans))
+        {
+            if (box.z_max - box.z_min >= kBBoxMinHeight || cluster->points.size() >= kMinSize * 2) 
+            {
+                renderBox(viewer, box, cluster_ID,Color(0.5, 1, 0));
+            }
+            overlapFlag=1;
         }
+        else{
+            if (box.z_max - box.z_min >= kBBoxMinHeight || cluster->points.size() >= kMinSize * 2)
+            {
+                renderBox(viewer, box, cluster_ID);
+            }
+        }
+        // TRK4D_fn_isBBoxOverlap( detect_box_trans,object_box_trans);
+        // Filter out some cluster with little points and shorter in height
+        // if (box.z_max - box.z_min >= kBBoxMinHeight || cluster->points.size() >= kMinSize * 2) {
+        //     renderBox(viewer, box, cluster_ID);
+        // }
 
         cluster_ID++;
     }
+    if(overlapFlag==0)//如果当前没有障碍物 那么停车位置于初始位置  
+    {
+        parkinglotMemory = detect_box;
+        memoryLocate = currentLocate;
+    }
+    else //如果当前有障碍物，那么停车位的位置是memorylot由 memorylocate和currentlocate之间的变换而转换而来的
+    {
+        PointTypePose memoryPose6D = navodometry2PointTypePose(memoryLocate);
+        PointTypePose currentPose6D = navodometry2PointTypePose(currentLocate);
+
+        Eigen::Affine3f transMemory = pcl::getTransformation(memoryPose6D.x, memoryPose6D.y, memoryPose6D.z, memoryPose6D.roll, memoryPose6D.pitch, memoryPose6D.yaw);
+        // transMemory = transMemory.inverse();
+        Eigen::Affine3f transCurrent = pcl::getTransformation(currentPose6D.x, currentPose6D.y, currentPose6D.z, currentPose6D.roll, currentPose6D.pitch, currentPose6D.yaw);
+        // transCurrent = transCurrent.inverse();
+        Eigen::Affine3f transBetween =transCurrent.inverse()*transMemory;
+
+        Box tempBox{100, 100, -1, -100, -100, 1};
+        vector<TRK4D_POINT2> tempPoints;
+        tempPoints.push_back({detect_box.x_max,detect_box.y_max});
+        tempPoints.push_back({detect_box.x_max,detect_box.y_min});
+        tempPoints.push_back({detect_box.x_min,detect_box.y_max});
+        tempPoints.push_back({detect_box.x_min,detect_box.y_min});
+
+        // vector<TRK4D_POINT2> resPoints(4);int indextemp=0;
+
+        for (auto iter=tempPoints.cbegin(); iter != tempPoints.cend(); iter++)
+        {
+            float x =transBetween(0,0) * (*iter).x + transBetween(0,1) * (*iter).y + transBetween(0,2) * 1+ transBetween(0,3);
+            float y =transBetween(1,0) * (*iter).x + transBetween(1,1) * (*iter).y + transBetween(1,2) * 1+ transBetween(1,3);
+            tempBox.x_max = max(tempBox.x_max,x);
+            tempBox.y_max = max(tempBox.y_max,y);
+            tempBox.x_min = min(tempBox.x_min,x);
+            tempBox.y_min = min(tempBox.y_min,y);
+        }
+
+        renderBox(viewer, tempBox, cluster_ID+1,Color(0, 1, 0));
+        
+
+    }
+}
+
+void computeTransedPoint(float x, float y)
+{
+    
+}
+
+PointTypePose navodometry2PointTypePose(nav_msgs::Odometry odometryIn)
+{
+    PointTypePose thisPose6D;
+    thisPose6D.x = odometryIn.pose.pose.position.x;
+    thisPose6D.y = odometryIn.pose.pose.position.y;
+    thisPose6D.z = odometryIn.pose.pose.position.z;
+
+    tf::Quaternion bt_q;
+    quaternionMsgToTF(odometryIn.pose.pose.orientation, bt_q);
+    tfScalar pitch, roll, yaw;
+    tf::Matrix3x3(bt_q).getRPY( roll, pitch,yaw);
+
+    thisPose6D.roll  = roll;
+    thisPose6D.pitch = pitch;
+    thisPose6D.yaw   = yaw;
+    return thisPose6D;
+}
+
+void box2BboxVertex(Box inputbox,TRK4D_POINT3* result)
+{
+    result[0].x = inputbox.x_max;
+    result[0].y = inputbox.y_max;
+    result[0].z = 0;
+    result[1].x = inputbox.x_min;
+    result[1].y = inputbox.y_max;
+    result[1].z = 0;
+    result[2].x = inputbox.x_min;
+    result[2].y = inputbox.y_min;
+    result[2].z = 0;
+    result[3].x = inputbox.x_max;
+    result[3].y = inputbox.y_min;
+    result[3].z = 0;
+
+
 }
 
 //setAngle: SWITCH CAMERA ANGLE {XY, TopDown, Side, FPS}
